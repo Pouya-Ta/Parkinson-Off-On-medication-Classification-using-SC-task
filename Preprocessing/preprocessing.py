@@ -10,7 +10,7 @@ from mne.preprocessing import ICA
 from mne_icalabel import label_components
 
 # Configuration
-BIDS_ROOT = Path("/Users/pouya/Documents/Additional Academic Activities/MA/SC OFF:ON/Raw Data")
+BIDS_ROOT = Path("/Users/Raw Data")
 TASK_NAME = "SimonConflict"
 
 N_JOBS = 8
