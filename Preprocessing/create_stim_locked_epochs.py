@@ -7,11 +7,11 @@ import pandas as pd
 import numpy as np
 
 # Configuration
-BIDS_ROOT = Path("/Users/pouya/Documents/Additional Academic Activities/MA/SC OFF:ON/Raw Data")
+BIDS_ROOT = Path("/Users/Raw Data")
 TASK_NAME = "SimonConflict"
 
-TRIAL_TABLE_DIR = Path("/Users/pouya/Documents/Additional Academic Activities/MA/SC OFF:ON/My Codes/Preprocessing/derived_trial_tables")
-OUTPUT_DIR = Path("/Users/pouya/Documents/Additional Academic Activities/MA/SC OFF:ON/My Codes/derived_epochs")
+TRIAL_TABLE_DIR = Path("/Users/derived_trial_tables")
+OUTPUT_DIR = Path("/Users/derived_epochs")
 OUTPUT_DIR.mkdir(exist_ok=True, parents=True)
 
 TMIN = -0.2
