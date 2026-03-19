@@ -16,9 +16,7 @@ MIN_RT = 0.15   # seconds
 MAX_RT = 3.00   # seconds
 
 
-# ----------------------------
 # Helpers
-# ----------------------------
 def get_subject_session_pairs(bids_root):
     subjects = glob(os.path.join(bids_root, "sub-*"))
     pairs = []
