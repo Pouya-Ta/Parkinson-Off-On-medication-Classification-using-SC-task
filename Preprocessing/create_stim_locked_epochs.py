@@ -117,3 +117,93 @@ def build_events_array(raw, trial_df, event_codes):
     ])
 
     return events
+
+
+def create_stim_locked_epochs(subject_id, session_id):
+    print(f"\n=== Stim-locked epoching: sub-{subject_id}, ses-{session_id} ===")
+
+    fif_path = get_preprocessed_fif_path(subject_id, session_id)
+    trial_path = get_trial_table_path(subject_id, session_id)
+    out_path = get_output_epoch_path(subject_id, session_id)
+
+    if not fif_path.exists():
+        print(f"  -> Missing preprocessed fif: {fif_path}")
+        return
+
+    if not trial_path.exists():
+        print(f"  -> Missing trial table: {trial_path}")
+        return
+
+    raw = mne.io.read_raw_fif(fif_path, preload=True, verbose=False)
+    trial_df = load_trial_table(subject_id, session_id)
+
+    if len(trial_df) == 0:
+        print("  -> No valid trials after filtering. Skipping.")
+        return
+
+    event_names, event_codes, event_id = make_event_id_from_metadata(trial_df)
+    trial_df = trial_df.copy()
+    trial_df["event_name"] = event_names
+    trial_df["event_code"] = event_codes
+
+    events = build_events_array(raw, trial_df, event_codes)
+
+    metadata_cols = [
+        "subject_id",
+        "session_id",
+        "group",
+        "med_state",
+        "stim_onset",
+        "stim_code_raw",
+        "stim_value_raw",
+        "response_exists",
+        "response_onset",
+        "response_side",
+        "response_correctness",
+        "is_correct",
+        "no_response",
+        "rt",
+        "feedback_present",
+        "feedback_onset",
+        "feedback_value",
+        "is_complete_trial",
+        "exclude_from_main_analysis",
+        "exclude_reason",
+        "event_name",
+        "event_code",
+    ]
+    metadata_cols = [c for c in metadata_cols if c in trial_df.columns]
+    metadata = trial_df[metadata_cols].copy()
+
+    epochs = mne.Epochs(
+        raw,
+        events=events,
+        event_id=event_id,
+        tmin=TMIN,
+        tmax=TMAX,
+        baseline=BASELINE,
+        picks="eeg",
+        preload=True,
+        reject=REJECT_CRITERIA,
+        metadata=metadata,
+        verbose=True,
+    )
+
+    epochs.save(out_path, overwrite=True)
+    print(f"  -> Saved: {out_path}")
+    print(f"  -> Epochs kept: {len(epochs)}")
+    print(f"  -> Event ID: {event_id}")
+
+
+def main():
+    pairs = get_subject_session_pairs(BIDS_ROOT)
+
+    for subject_id, session_id in pairs:
+        try:
+            create_stim_locked_epochs(subject_id, session_id)
+        except Exception as e:
+            print(f"Failed for sub-{subject_id}, ses-{session_id}: {e}")
+
+
+if __name__ == "__main__":
+    main()
