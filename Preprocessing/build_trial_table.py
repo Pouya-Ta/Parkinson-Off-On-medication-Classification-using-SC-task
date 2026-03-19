@@ -4,9 +4,7 @@ from pathlib import Path
 import pandas as pd
 import numpy as np
 
-# ----------------------------
 # Configuration
-# ----------------------------
 SCRIPT_DIR = Path(__file__).parent
 BIDS_ROOT = Path("/Users/pouya/Documents/Additional Academic Activities/MA/SC OFF:ON/Raw Data")
 TASK_NAME = "SimonConflict"
