@@ -33,10 +33,11 @@ DATASET_NAME = "CTL_vs_PD"
 N_SPLITS = 5
 RANDOM_STATE = 42
 
-BATCH_SIZE = 64
-N_EPOCHS = 60
-LEARNING_RATE = 1e-3
+BATCH_SIZE = 128
+N_EPOCHS = 200          # high cap — early stopping is the primary terminator
+LEARNING_RATE = 1e-4   # reduced from 1e-3
 WEIGHT_DECAY = 1e-4
+EARLY_STOPPING_PATIENCE = 7   # stop if val loss does not improve for 7 epochs
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -203,6 +204,19 @@ def train_one_fold(model, train_loader, optimizer, criterion):
 
 
 @torch.no_grad()
+def compute_val_loss(model, loader, criterion):
+    model.eval()
+    total_loss = 0.0
+    for X_batch, y_batch in loader:
+        X_batch = X_batch.to(DEVICE)
+        y_batch = y_batch.to(DEVICE)
+        logits = model(X_batch)
+        loss = criterion(logits, y_batch)
+        total_loss += loss.item() * len(y_batch)
+    return total_loss / len(loader.dataset)
+
+
+@torch.no_grad()
 def evaluate(model, loader):
     model.eval()
 
@@ -307,29 +321,51 @@ def main():
         best_metrics = None
         best_epoch = None
 
+        # Early stopping state
+        best_val_loss = np.inf
+        no_improve_count = 0
+        stopped_epoch = None
+
         for epoch in range(1, N_EPOCHS + 1):
             train_loss = train_one_fold(model, train_loader, optimizer, criterion)
+            val_loss = compute_val_loss(model, test_loader, criterion)
             metrics = evaluate(model, test_loader)
 
+            # Track best classification metric
             if metrics["balanced_accuracy"] > best_bacc:
                 best_bacc = metrics["balanced_accuracy"]
                 best_metrics = metrics.copy()
                 best_epoch = epoch
 
+            # Early stopping on validation loss
+            if val_loss < best_val_loss:
+                best_val_loss = val_loss
+                no_improve_count = 0
+            else:
+                no_improve_count += 1
+
             if epoch % 10 == 0 or epoch == 1:
                 print(
                     f"Epoch {epoch:03d} | "
-                    f"loss={train_loss:.4f} | "
+                    f"train_loss={train_loss:.4f} | "
+                    f"val_loss={val_loss:.4f} | "
                     f"acc={metrics['accuracy']:.4f} | "
                     f"bacc={metrics['balanced_accuracy']:.4f} | "
                     f"f1={metrics['f1']:.4f} | "
                     f"auc={metrics['auc']:.4f}"
                 )
 
+            if no_improve_count >= EARLY_STOPPING_PATIENCE:
+                stopped_epoch = epoch
+                print(f"Early stopping at epoch {epoch} (val loss no improvement for {EARLY_STOPPING_PATIENCE} epochs)")
+                break
+
         fold_rows.append({
             "dataset": DATASET_NAME,
             "fold": fold_idx,
             "best_epoch": best_epoch,
+            "stopped_epoch": stopped_epoch if stopped_epoch is not None else epoch,
+            "early_stopped": stopped_epoch is not None,
             "n_train_epochs": len(train_idx),
             "n_test_epochs": len(test_idx),
             "n_train_subjects": len(train_subjects),
@@ -350,6 +386,11 @@ def main():
     summary_row = {
         "dataset": DATASET_NAME,
         "n_folds": len(fold_df),
+        "learning_rate": LEARNING_RATE,
+        "batch_size": BATCH_SIZE,
+        "early_stopping_patience": EARLY_STOPPING_PATIENCE,
+        "n_early_stopped_folds": int(fold_df["early_stopped"].sum()),
+        "mean_stopped_epoch": fold_df["stopped_epoch"].mean(),
         "mean_best_epoch": fold_df["best_epoch"].mean(),
         "std_best_epoch": fold_df["best_epoch"].std(),
         "mean_accuracy": fold_df["accuracy"].mean(),
